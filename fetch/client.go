@@ -9,8 +9,14 @@ import (
 	"github.com/YelyzavetaV/country-fetcher/process"
 )
 
+// Provides methods for fetching country and region data via RESTful
+// Country API
 type Client interface {
+	// Fetch n or all countries matching the query
+	// (by country name, by region name, or by country code).
 	FetchCountries(query Query, n int) ([]models.Country, error)
+
+	// Compute region statistics for n or all countries.
 	ProcessRegion(name string, n int) (*models.Region, error)
 }
 

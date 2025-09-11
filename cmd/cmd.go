@@ -33,43 +33,57 @@ var fetchCountriesCmd = &cobra.Command{
 	Short: "Get info about a country or countries",
 	Long:  `
 Get info about one or multiple countries by country name, region name, or country code.
-
-Arguments:
---all: fetch all matching countries - typically, in a given region.
-	   Note that --all has precendence over --n, i.e., providing
-	   "--all true --n <value>" will lead to the value of n being
-	   ignored.
 	`,
 	Run: fetchCountries,
 }
 
 var processRegionCmd = &cobra.Command{
 	Use:   "region",
-	Short: "Get stats of n or all countries in a region",
-	Long:  "",
+	Short: "Get stats of n or all countries in the region",
+	Long:  `
+Compute statistics for n or all countries in the region.
+	`,
 	Run:   processRegion,
 }
 
 func init() {
-	fetchCountriesCmd.Flags().StringVar(&name, "name", "", "Country name")
 	fetchCountriesCmd.Flags().StringVar(
-		&region, "region", "", "Geographical region")
+		&name, "name", "",
+			"Country name. Has precedence over --region and --code - " +
+			"providing a non-empty name leads to region and country code " +
+			"values being ignored.")
+	fetchCountriesCmd.Flags().StringVar(
+		&region, "region", "",
+			"Geographical region. Has precendence over --code - providing " +
+			"a non-empty region leads to the country code value being ignored.")
 	fetchCountriesCmd.Flags().StringVar(&code, "code", "", "Country code")
 	fetchCountriesCmd.Flags().BoolVar(
-		&fullText, "fulltext", false, "Use full text name search")
+		&fullText, "fulltext", false,
+			"Use full text name search. Only relevant when quering country by name.")
 	fetchCountriesCmd.Flags().BoolVar(
 		&all, "all", false,
-			"Fetch all matching countries (typically, in a region)")
+			"Fetch all matching countries (typically, in a region). " +
+			"Note that --all has precendence over --n, i.e., providing " +
+			"'--all true --n <value>' will lead to the value of n being ignored.")
 	fetchCountriesCmd.Flags().IntVar(
-		&n, "n", 1, "Maximum number of countries to fetch")
+		&n, "n", 1,
+			"Maximum number of countries to fetch. For all=false, " +
+			"a non-positive n is interpreted as all=true.")
 
 	RootCmd.AddCommand(fetchCountriesCmd)
 
 	processRegionCmd.Flags().StringVar(&name, "name", "", "Region name")
+	processRegionCmd.MarkFlagRequired("name")
+
 	processRegionCmd.Flags().BoolVar(
-		&all, "all", false, "Fetch all countries in the region")
+		&all, "all", false,
+			"Fetch all countries in the region. Note that --all has " +
+			"precendence over --n, i.e., providing '--all true --n <value>' " +
+			"will lead to the value of n being ignored.")
 	processRegionCmd.Flags().IntVar(
-		&n, "n", 10, "Maximum number of countries to fetch")
+		&n, "n", 10,
+			"Maximum number of countries to fetch. For all=false, " +
+			"a non-positive n is interpreted as all=true.")
 
 	RootCmd.AddCommand(processRegionCmd)
 }
