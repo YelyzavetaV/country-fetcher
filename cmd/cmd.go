@@ -5,10 +5,15 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/YelyzavetaV/country-fetcher/config"
 	"github.com/YelyzavetaV/country-fetcher/fetch"
+	"github.com/YelyzavetaV/country-fetcher/output"
 )
 
-var client fetch.Client = fetch.NewClient()
+var (
+	cfg *config.Config
+	client fetch.Client
+)
 
 // Command-line arguments
 var (
@@ -21,11 +26,12 @@ var (
 )
 
 var RootCmd = &cobra.Command{
-	Use:   "country-fetcher",
-	Short: "Fetch country information from REST Countries",
-	Long:  `
+	Use:              "country-fetcher",
+	Short:            "Fetch country information from REST Countries",
+	Long:             `
 A CLI tool to fetch and process country and region data using RESTful Country API.
 	`,
+	PersistentPreRun: setup,
 }
 
 var fetchCountriesCmd = &cobra.Command{
@@ -34,7 +40,7 @@ var fetchCountriesCmd = &cobra.Command{
 	Long:  `
 Get info about one or multiple countries by country name, region name, or country code.
 	`,
-	Run: fetchCountries,
+	Run:   fetchCountries,
 }
 
 var processRegionCmd = &cobra.Command{
@@ -88,6 +94,11 @@ func init() {
 	RootCmd.AddCommand(processRegionCmd)
 }
 
+func setup(cmd *cobra.Command, args []string) {
+	cfg = config.NewConfig()
+	client = fetch.NewClient()
+}
+
 func fetchCountries(cmd *cobra.Command, args []string) {
 	var query fetch.Query
 	if name != "" {
@@ -114,10 +125,11 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	fmt.Println("Fetched data:")
-	for _, country := range countries {
-		fmt.Printf("%+v\n", country)
+	s, err := output.ToJSONString(countries, cfg.JSONPrefix, cfg.JSONIndent)
+	if err != nil {
+		fmt.Printf("Failed to marshal countries to JSON: %v", err)
 	}
+	fmt.Println(s)
 }
 
 func processRegion(cmd *cobra.Command, args []string) {
