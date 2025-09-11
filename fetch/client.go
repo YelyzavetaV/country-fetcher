@@ -9,7 +9,7 @@ import (
 )
 
 type Client interface {
-	Fetch(query Query, n int) ([]models.Country, error)
+	FetchCountries(query Query, n int) ([]models.Country, error)
 }
 
 type clientImpl struct{}
@@ -18,7 +18,7 @@ func NewClient() Client {
 	return &clientImpl{}
 }
 
-func (c *clientImpl) Fetch(q Query, n int) ([]models.Country, error) {
+func (c *clientImpl) FetchCountries(q Query, n int) ([]models.Country, error) {
 	url := q.buildURL()
 
 	response, err := http.Get(url)

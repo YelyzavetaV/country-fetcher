@@ -66,7 +66,7 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	countries, err := client.Fetch(query, n)
+	countries, err := client.FetchCountries(query, n)
 	if err != nil {
 		fmt.Printf("Failed to fetch data: %v", err)
 		return
