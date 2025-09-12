@@ -100,3 +100,27 @@ func (c *clientImpl) FetchRegion(q Query, n int) (*models.Region, error) {
 
 	return &region, nil
 }
+
+// Execute fetch queries each in their own goroutine.
+func Fetch[T any](
+	queries []Query,
+	fetcher func(Query, int) (T, error),
+	n int,
+) chan T {
+	ch := make(chan T, len(queries))
+
+	for _, q := range queries {
+		go func(query Query) {
+			res, err := fetcher(query, n)
+			if err != nil {
+				fmt.Printf("Failed to fetch data: %v\n", err)
+
+				var zero T
+				ch <- zero
+				return
+			}
+			ch <- res
+		}(q)
+	}
+	return ch
+}

@@ -7,7 +7,6 @@ import (
 	"github.com/YelyzavetaV/country-fetcher/config"
 	"github.com/YelyzavetaV/country-fetcher/client"
 	"github.com/YelyzavetaV/country-fetcher/output"
-	"github.com/YelyzavetaV/country-fetcher/models"
 )
 
 var (
@@ -100,8 +99,8 @@ func setup(cmd *cobra.Command, args []string) {
 }
 
 func fetchCountries(cmd *cobra.Command, args []string) {
+	// Assemble queries.
 	var queries []client.Query
-
 	if len(names) != 0 {
 		for _, name := range names {
 			queries = append(
@@ -121,20 +120,7 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 	}
 
 	if all { n = -1 }
-
-	ch := make(chan []models.Country, len(queries))
-
-	for _, q := range queries {
-		go func(query client.Query){
-			countries, err := c.FetchCountries(query, n)
-			if err != nil {
-				fmt.Printf("Failed to fetch data: %v", err)
-				ch <- nil
-				return
-			}
-			ch <- countries
-		}(q)
-	}
+	ch := client.Fetch(queries, c.FetchCountries, n)
 
 	for range queries {
 		countries := <-ch
@@ -159,20 +145,7 @@ func fetchRegions(cmd *cobra.Command, args []string) {
 	queries := make([]client.Query, len(regions))
 
 	if all { n = -1 }
-
-	ch := make(chan *models.Region, len(regions))
-
-	for _, q := range queries {
-		go func(query client.Query) {
-			region, err := c.FetchRegion(query, n)
-			if err != nil {
-				fmt.Printf("Failed to fetch data: %v", err)
-				ch <- nil
-				return
-			}
-			ch <- region
-		}(q)
-	}
+	ch := client.Fetch(queries, c.FetchRegion, n)
 
 	for range queries {
 		region := <-ch
