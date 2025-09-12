@@ -124,8 +124,8 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 
 	ch := make(chan []models.Country, len(queries))
 
-	for _, query := range queries {
-		go func(countryQuery fetch.Query){
+	for _, q := range queries {
+		go func(query fetch.Query){
 			countries, err := client.FetchCountries(query, n)
 			if err != nil {
 				fmt.Printf("Failed to fetch data: %v", err)
@@ -133,7 +133,7 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 				return
 			}
 			ch <- countries
-		}(query)
+		}(q)
 	}
 
 	for range queries {
