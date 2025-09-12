@@ -3,31 +3,60 @@ package output
 import (
 	"os"
 	"encoding/json"
+	"fmt"
 )
 
-func ToJSONString(
+func toJSONBytes(
 	v interface{},
 	prefix string,
 	indent string,
-) (string, error) {
-	s, err := json.MarshalIndent(v, prefix, indent)
-	if err != nil {
-		return "", err
-	}
-	return string(s), nil
+) ([]byte, error) {
+	return json.MarshalIndent(v, prefix, indent)
 }
 
-func ToJSONFile(
+func toJSONFile(
 	v interface{},
 	filename string,
 	prefix string,
 	indent string,
+	perm os.FileMode,
 ) error {
-	file, err := os.Create(filename)
-	if err != nil { return err }
-	defer file.Close()
+	b, err := toJSONBytes(v, prefix, indent)
+	if err != nil {
+		return err
+	}
 
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent(prefix, indent)
-	return encoder.Encode(v)
+	fileExisted := false
+	if _, err := os.Stat(filename); err == nil {
+		fileExisted = true
+	}
+
+	if err = os.WriteFile(filename, b, perm); err != nil {
+		return err
+	}
+
+	// Force desired permissions if file already existed with different
+	// permissions
+	if fileExisted { return os.Chmod(filename, perm) }
+	return nil
+}
+
+func ToJSON(
+	v interface{},
+	filename string,
+	prefix string,
+	indent string,
+	perm os.FileMode,
+) error {
+	if filename != "" {
+		return toJSONFile(v, filename, prefix, indent, perm)
+	}
+
+	b, err := toJSONBytes(v, prefix, indent)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(b))
+	return nil
 }

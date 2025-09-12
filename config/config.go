@@ -1,12 +1,16 @@
 package config
 
 import (
+	"os"
+
 	env "github.com/caarlos0/env/v11"
 )
 
 type Config struct {
-	JSONPrefix string `env:"JSON_PREFIX" envDefault:""`
-	JSONIndent string `env:"JSON_INDENT" envDefault:"  "`
+	JSONPrefix         string      `env:"JSON_PREFIX" envDefault:""`
+	JSONIndent         string      `env:"JSON_INDENT" envDefault:"  "`
+	JSONFilePermission os.FileMode `env:"JSON_FILE_PERMISSION" envDefault:"420"`
+	JSONForceOverride  bool        `env:"JSON_FORCE_OVERRIDE" envDefault:"true"`
 }
 
 func NewConfig() *Config {

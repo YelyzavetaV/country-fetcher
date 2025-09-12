@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/YelyzavetaV/country-fetcher/config"
@@ -17,12 +16,13 @@ var (
 
 // Command-line arguments
 var (
-	name     string
-	region   string
-	code     string
-	fullText bool
-	all      bool
-	n        int
+	name         string
+	region       string
+	code         string
+	fullText     bool
+	all          bool
+	n            int
+	filename     string
 )
 
 var RootCmd = &cobra.Command{
@@ -75,6 +75,10 @@ func init() {
 		&n, "n", 1,
 			"Maximum number of countries to fetch. For all=false, " +
 			"a non-positive n is interpreted as all=true.")
+	fetchCountriesCmd.Flags().StringVar(
+		&filename, "file", "",
+			"Name of a file the output is to be written to. If not " +
+			"provided, JSON string is outputted to console.")
 
 	RootCmd.AddCommand(fetchCountriesCmd)
 
@@ -90,6 +94,10 @@ func init() {
 		&n, "n", 10,
 			"Maximum number of countries to fetch. For all=false, " +
 			"a non-positive n is interpreted as all=true.")
+	processRegionCmd.Flags().StringVar(
+		&filename, "file", "",
+			"Name of a file the output is to be written to. If not " +
+			"provided, JSON string is outputted to console.")
 
 	RootCmd.AddCommand(processRegionCmd)
 }
@@ -125,11 +133,15 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	s, err := output.ToJSONString(countries, cfg.JSONPrefix, cfg.JSONIndent)
-	if err != nil {
-		fmt.Printf("Failed to marshal countries to JSON: %v", err)
+	if err := output.ToJSON(
+		countries,
+		filename,
+		cfg.JSONPrefix,
+		cfg.JSONIndent,
+		cfg.JSONFilePermission,
+	); err != nil {
+		fmt.Printf("Failed to output data: %v", err)
 	}
-	fmt.Println(s)
 }
 
 func processRegion(cmd *cobra.Command, args []string) {
@@ -141,13 +153,13 @@ func processRegion(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	fmt.Printf("Region: %s\n", region.Name)
-	fmt.Printf("Total population: %d\n", region.TotalPopulation)
-	fmt.Printf("Average population: %f\n", region.AvgPopulation)
-
-	countryNames := make([]string, len(region.Countries))
-	for i, country := range region.Countries {
-		countryNames[i] = country.Name
+	if err := output.ToJSON(
+		region,
+		filename,
+		cfg.JSONPrefix,
+		cfg.JSONIndent,
+		cfg.JSONFilePermission,
+	); err != nil {
+		fmt.Printf("Failed to output data: %v", err)
 	}
-	fmt.Printf("Countries: %v\n", strings.Join(countryNames, ", "))
 }
