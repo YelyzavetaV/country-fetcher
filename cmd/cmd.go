@@ -5,14 +5,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/YelyzavetaV/country-fetcher/config"
-	"github.com/YelyzavetaV/country-fetcher/fetch"
+	"github.com/YelyzavetaV/country-fetcher/client"
 	"github.com/YelyzavetaV/country-fetcher/output"
 	"github.com/YelyzavetaV/country-fetcher/models"
 )
 
 var (
 	cfg *config.Config
-	client fetch.Client
+	c client.Client
 )
 
 // Command-line arguments
@@ -44,13 +44,13 @@ Get info about one or multiple countries by country name or country code.
 	Run:   fetchCountries,
 }
 
-var processRegionsCmd = &cobra.Command{
+var fetchRegionsCmd = &cobra.Command{
 	Use:   "fetch-regions",
 	Short: "Get stats of n or all countries in the region",
 	Long:  `
 Compute statistics for n or all countries in the region.
 	`,
-	Run:   processRegions,
+	Run:   fetchRegions,
 }
 
 func init() {
@@ -72,41 +72,41 @@ func init() {
 
 	RootCmd.AddCommand(fetchCountriesCmd)
 
-	processRegionsCmd.Flags().StringSliceVar(
+	fetchRegionsCmd.Flags().StringSliceVar(
 		&regions, "regions", []string{},
 			"Comma-separated list of region names (e.g., Europe,Asia,Africa)")
-	processRegionsCmd.MarkFlagRequired("regions")
+	fetchRegionsCmd.MarkFlagRequired("regions")
 
-	processRegionsCmd.Flags().BoolVar(
+	fetchRegionsCmd.Flags().BoolVar(
 		&all, "all", false,
 			"Fetch all countries in the region. Note that --all has " +
 			"precendence over --n, i.e., providing '--all true --n <value>' " +
 			"will lead to the value of n being ignored.")
-	processRegionsCmd.Flags().IntVar(
+	fetchRegionsCmd.Flags().IntVar(
 		&n, "n", 10,
 			"Maximum number of countries to fetch. For all=false, " +
 			"a non-positive n is interpreted as all=true.")
-	processRegionsCmd.Flags().StringVar(
+	fetchRegionsCmd.Flags().StringVar(
 		&filename, "file", "",
 			"Name of a file the output is to be written to. If not " +
 			"provided, JSON string is outputted to console.")
 
-	RootCmd.AddCommand(processRegionsCmd)
+	RootCmd.AddCommand(fetchRegionsCmd)
 }
 
 func setup(cmd *cobra.Command, args []string) {
 	cfg = config.NewConfig()
-	client = fetch.NewClient()
+	c = client.NewClient()
 }
 
 func fetchCountries(cmd *cobra.Command, args []string) {
-	var queries []fetch.Query
+	var queries []client.Query
 
 	if len(names) != 0 {
 		for _, name := range names {
 			queries = append(
 				queries,
-				fetch.NameQuery{
+				client.NameQuery{
 					Name:     name,
 					FullText: fullText,
 				},
@@ -114,7 +114,7 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 		}
 	} else if len(codes) != 0 {
 		for _, code := range codes {
-			queries = append(queries, fetch.CodeQuery{Code: code})
+			queries = append(queries, client.CodeQuery{Code: code})
 		}
 	} else {
 		return
@@ -125,8 +125,8 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 	ch := make(chan []models.Country, len(queries))
 
 	for _, q := range queries {
-		go func(query fetch.Query){
-			countries, err := client.FetchCountries(query, n)
+		go func(query client.Query){
+			countries, err := c.FetchCountries(query, n)
 			if err != nil {
 				fmt.Printf("Failed to fetch data: %v", err)
 				ch <- nil
@@ -155,25 +155,26 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 	}
 }
 
-func processRegions(cmd *cobra.Command, args []string) {
+func fetchRegions(cmd *cobra.Command, args []string) {
+	queries := make([]client.Query, len(regions))
+
 	if all { n = -1 }
 
 	ch := make(chan *models.Region, len(regions))
 
-	for _, r := range regions {
-		go func(name string) {
-			region, err := client.ProcessRegion(name, n)
+	for _, q := range queries {
+		go func(query client.Query) {
+			region, err := c.FetchRegion(query, n)
 			if err != nil {
-				fmt.Printf(
-					"Failed to get data for region %s: %v", name, err)
+				fmt.Printf("Failed to fetch data: %v", err)
 				ch <- nil
 				return
 			}
 			ch <- region
-		}(r)
+		}(q)
 	}
 
-	for range regions {
+	for range queries {
 		region := <-ch
 		if region == nil {
 			fmt.Println("Region fetch failed. Skipping...")

@@ -1,6 +1,7 @@
-package fetch
+package client
 
 import (
+	"fmt"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,10 +15,10 @@ import (
 type Client interface {
 	// Fetch n or all countries matching the query
 	// (by country name, by region name, or by country code).
-	FetchCountries(query Query, n int) ([]models.Country, error)
+	FetchCountries(q Query, n int) ([]models.Country, error)
 
 	// Compute region statistics for n or all countries.
-	ProcessRegion(name string, n int) (*models.Region, error)
+	FetchRegion(q Query, n int) (*models.Region, error)
 }
 
 type clientImpl struct{}
@@ -64,10 +65,17 @@ func (c *clientImpl) FetchCountries(q Query, n int) ([]models.Country, error) {
 	return countries, nil
 }
 
-func (c *clientImpl) ProcessRegion(name string, n int) (*models.Region, error) {
-	query := RegionQuery{name}
+func (c *clientImpl) FetchRegion(q Query, n int) (*models.Region, error) {
+	// Validate that the input query is RegionQuery
+	var name string
+	if rq, ok := q.(RegionQuery); ok {
+		name = rq.Region
+	} else {
+		return nil, fmt.Errorf(
+			"FetchRegion requires RegionQuery; got %T", q)
+	}
 
-	countries, err := c.FetchCountries(query, n)
+	countries, err := c.FetchCountries(q, n)
 	if err != nil {
 		return nil, err
 	}
