@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/YelyzavetaV/country-fetcher/models"
 	"github.com/YelyzavetaV/country-fetcher/process"
 )
 
+// Abstracts the response of client fetch attempt
 type FetchResponse struct {
 	Value interface{}
 	Err   error
@@ -124,16 +126,25 @@ func (c *clientImpl) Fetch(queries []Query, n int) chan FetchResponse {
 		}
 	}
 
-	ch := make(chan FetchResponse, len(queries))
+	nq := len(queries)
+
+	ch := make(chan FetchResponse, nq)
+	var wg sync.WaitGroup
+	wg.Add(nq)
 
 	for _, q := range queries {
 		go func(query Query) {
+			defer wg.Done()
+
 			res, err := f(query, n)
-			ch <- FetchResponse{
-				Value: res,
-				Err:   err,
-			}
+			ch <- FetchResponse{Value: res, Err: err}
 		}(q)
 	}
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
 	return ch
 }

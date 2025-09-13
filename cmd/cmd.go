@@ -124,8 +124,7 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 	if all { ncMax = -1 }
 	ch := c.Fetch(queries, ncMax)
 
-	for range queries {
-		res := <-ch
+	for res := range ch {
 		if res.Err != nil {
 			fmt.Printf("Fetch failed: %v\n", res.Err)
 			continue
@@ -152,8 +151,7 @@ func fetchRegions(cmd *cobra.Command, args []string) {
 	if all { ncMax = -1 }
 	ch := c.Fetch(queries, ncMax)
 
-	for range queries {
-		res := <-ch
+	for res := range ch {
 		if res.Err != nil {
 			fmt.Printf("Fetch failed: %v\n", res.Err)
 			continue
