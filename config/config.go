@@ -14,6 +14,8 @@ type Config struct {
 	JSONIndent         string      `env:"JSON_INDENT" envDefault:"  "`
 	JSONFilePermission os.FileMode `env:"JSON_FILE_PERMISSION" envDefault:"420"`
 	JSONForceOverride  bool        `env:"JSON_FORCE_OVERRIDE" envDefault:"true"`
+// Logging
+	LogLevel           string      `env:"LOG_LEVEL" envDefault:"INFO"`
 }
 
 func NewConfig() *Config {

@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"os"
 	"fmt"
 	"time"
+	"log/slog"
 
 	"github.com/spf13/cobra"
+	"github.com/YelyzavetaV/country-fetcher/logging"
 	"github.com/YelyzavetaV/country-fetcher/config"
 	"github.com/YelyzavetaV/country-fetcher/client"
 	"github.com/YelyzavetaV/country-fetcher/output"
@@ -112,6 +115,22 @@ func setup(cmd *cobra.Command, args []string) {
 			"a valid duration string (e.g., '10s', '500ms').",
 			cfg.HTTPTimeout))
 	}
+
+	var logLevel slog.Level
+	if logLevel, err = logging.ParseLogLevel(cfg.LogLevel); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+	}
+	logging.InitLogger(slog.HandlerOptions{
+		Level: logLevel,
+	})
+
+	logging.Log.Info(
+		"Setup complete",
+		"HTTPTimeout",
+		timeout,
+		"LogLevel",
+		logLevel,
+	)
 }
 
 func fetchCountries(cmd *cobra.Command, args []string) {
