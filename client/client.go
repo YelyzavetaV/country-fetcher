@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"context"
+	"time"
 	"sync"
 
 	"github.com/YelyzavetaV/country-fetcher/models"
@@ -22,13 +24,15 @@ type FetchResponse struct {
 type Client interface {
 	// Fetch n or all countries matching the query
 	// (by country name, by region name, or by country code).
-	fetchCountries(q Query, ncMax int) ([]models.Country, error)
+	fetchCountries(
+		q Query, ncMax int, timeout time.Duration) ([]models.Country, error)
 
 	// Compute region statistics for n or all countries.
-	fetchRegion(q Query, ncMax int) (*models.Region, error)
+	fetchRegion(
+		q Query, ncMax int, timeout time.Duration) (*models.Region, error)
 
 	// Fetch data for multiple countries or multiple regions concurrently.
-	Fetch(queries []Query, ncMax int) chan FetchResponse
+	Fetch(queries []Query, ncMax int, timeout time.Duration) chan FetchResponse
 }
 
 type clientImpl struct{}
@@ -38,17 +42,25 @@ func NewClient() Client {
 }
 
 func (c *clientImpl) fetchCountries(
-	q Query, ncMax int,
+	q Query, ncMax int, timeout time.Duration,
 ) ([]models.Country, error) {
 	url := q.buildURL()
 
-	response, err := http.Get(url)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
-	body, err := io.ReadAll(response.Body)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +89,9 @@ func (c *clientImpl) fetchCountries(
 	return countries, nil
 }
 
-func (c *clientImpl) fetchRegion(q Query, ncMax int) (*models.Region, error) {
+func (c *clientImpl) fetchRegion(
+	q Query, ncMax int, timeout time.Duration,
+) (*models.Region, error) {
 	// Validate that the input query is RegionQuery
 	var name string
 	if rq, ok := q.(RegionQuery); ok {
@@ -87,7 +101,7 @@ func (c *clientImpl) fetchRegion(q Query, ncMax int) (*models.Region, error) {
 			"fetchRegion requires RegionQuery; got %T", q)
 	}
 
-	countries, err := c.fetchCountries(q, ncMax)
+	countries, err := c.fetchCountries(q, ncMax, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -114,20 +128,23 @@ func (c *clientImpl) fetchRegion(q Query, ncMax int) (*models.Region, error) {
 }
 
 // Execute fetch queries each in their own goroutine.
-func (c *clientImpl) Fetch(queries []Query, n int) chan FetchResponse {
+func (c *clientImpl) Fetch(
+	queries []Query, n int, timeout time.Duration,
+) chan FetchResponse {
 	var f func(Query, int) (interface{}, error)
 	if _, ok := queries[0].(RegionQuery); ok {
 		f = func(q Query, n int) (interface{}, error) {
-			return c.fetchRegion(q, n)
+			return c.fetchRegion(q, n, timeout)
 		}
 	} else {
 		f = func(q Query, n int) (interface{}, error) {
-			return c.fetchCountries(q, n)
+			return c.fetchCountries(q, n, timeout)
 		}
 	}
 
 	nq := len(queries)
 
+	// Make buffered channel and wait group to eventually close ch
 	ch := make(chan FetchResponse, nq)
 	var wg sync.WaitGroup
 	wg.Add(nq)

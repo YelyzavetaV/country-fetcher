@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/YelyzavetaV/country-fetcher/config"
@@ -12,6 +13,8 @@ import (
 var (
 	cfg *config.Config
 	c client.Client
+// Configs to be validated at setup
+	timeout time.Duration
 )
 
 // Command-line arguments
@@ -98,6 +101,17 @@ func init() {
 func setup(cmd *cobra.Command, args []string) {
 	cfg = config.NewConfig()
 	c = client.NewClient()
+
+	// Parse and validate configs
+	var err error
+
+	timeout, err = time.ParseDuration(cfg.HTTPTimeout)
+	if err != nil {
+		panic(fmt.Errorf(
+			"Invalid HTTP timeout value '%s' in config. Please use " +
+			"a valid duration string (e.g., '10s', '500ms').",
+			cfg.HTTPTimeout))
+	}
 }
 
 func fetchCountries(cmd *cobra.Command, args []string) {
@@ -122,7 +136,7 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 	}
 
 	if all { ncMax = -1 }
-	ch := c.Fetch(queries, ncMax)
+	ch := c.Fetch(queries, ncMax, timeout)
 
 	for res := range ch {
 		if res.Err != nil {
@@ -149,7 +163,7 @@ func fetchRegions(cmd *cobra.Command, args []string) {
 	}
 
 	if all { ncMax = -1 }
-	ch := c.Fetch(queries, ncMax)
+	ch := c.Fetch(queries, ncMax, timeout)
 
 	for res := range ch {
 		if res.Err != nil {

@@ -7,6 +7,9 @@ import (
 )
 
 type Config struct {
+// HTTP config
+	HTTPTimeout        string      `env:"HTTP_TIMEOUT" envDefault:"10s"`
+// JSON output config
 	JSONPrefix         string      `env:"JSON_PREFIX" envDefault:""`
 	JSONIndent         string      `env:"JSON_INDENT" envDefault:"  "`
 	JSONFilePermission os.FileMode `env:"JSON_FILE_PERMISSION" envDefault:"420"`
