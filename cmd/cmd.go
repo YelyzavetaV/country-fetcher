@@ -21,7 +21,7 @@ var (
 	regions  []string
 	fullText bool
 	all      bool
-	n        int
+	ncMax    int
 	filename string
 )
 
@@ -63,7 +63,9 @@ func init() {
 		&fullText, "fulltext", false,
 			"Use full text name search. Only relevant when quering country by name.")
 	fetchCountriesCmd.Flags().IntVar(
-		&n, "n", 1, "Maximum number of countries to fetch.")
+		&ncMax, "n", 1,
+			"Maximum number of countries to fetch " +
+			"(relevant for fuzzy search by name).")
 	fetchCountriesCmd.Flags().StringVar(
 		&filename, "file", "",
 			"Name of a file the output is to be written to. If not " +
@@ -82,8 +84,8 @@ func init() {
 			"precendence over --n, i.e., providing '--all true --n <value>' " +
 			"will lead to the value of n being ignored.")
 	fetchRegionsCmd.Flags().IntVar(
-		&n, "n", 10,
-			"Maximum number of countries to fetch. For all=false, " +
+		&ncMax, "n", 10,
+			"Maximum number of countries per region. For all=false, " +
 			"a non-positive n is interpreted as all=true.")
 	fetchRegionsCmd.Flags().StringVar(
 		&filename, "file", "",
@@ -119,18 +121,18 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	if all { n = -1 }
-	ch := client.Fetch(queries, c.FetchCountries, n)
+	if all { ncMax = -1 }
+	ch := c.Fetch(queries, ncMax)
 
 	for range queries {
-		countries := <-ch
-		if countries == nil {
-			fmt.Println("Countries fetch failed. Skipping...")
+		res := <-ch
+		if res.Err != nil {
+			fmt.Printf("Fetch failed: %v\n", res.Err)
 			continue
 		}
 
 		if err := output.ToJSON(
-			countries,
+			res.Value,
 			filename,
 			cfg.JSONPrefix,
 			cfg.JSONIndent,
@@ -143,19 +145,22 @@ func fetchCountries(cmd *cobra.Command, args []string) {
 
 func fetchRegions(cmd *cobra.Command, args []string) {
 	queries := make([]client.Query, len(regions))
+	for i, region := range regions {
+		queries[i] = client.RegionQuery{region}
+	}
 
-	if all { n = -1 }
-	ch := client.Fetch(queries, c.FetchRegion, n)
+	if all { ncMax = -1 }
+	ch := c.Fetch(queries, ncMax)
 
 	for range queries {
-		region := <-ch
-		if region == nil {
-			fmt.Println("Region fetch failed. Skipping...")
+		res := <-ch
+		if res.Err != nil {
+			fmt.Printf("Fetch failed: %v\n", res.Err)
 			continue
 		}
 
 		if err := output.ToJSON(
-			region,
+			res.Value,
 			filename,
 			cfg.JSONPrefix,
 			cfg.JSONIndent,

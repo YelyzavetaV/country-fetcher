@@ -10,15 +10,23 @@ import (
 	"github.com/YelyzavetaV/country-fetcher/process"
 )
 
+type FetchResponse struct {
+	Value interface{}
+	Err   error
+}
+
 // Provides methods for fetching country and region data via RESTful
 // Country API
 type Client interface {
 	// Fetch n or all countries matching the query
 	// (by country name, by region name, or by country code).
-	FetchCountries(q Query, n int) ([]models.Country, error)
+	fetchCountries(q Query, ncMax int) ([]models.Country, error)
 
 	// Compute region statistics for n or all countries.
-	FetchRegion(q Query, n int) (*models.Region, error)
+	fetchRegion(q Query, ncMax int) (*models.Region, error)
+
+	// Fetch data for multiple countries or multiple regions concurrently.
+	Fetch(queries []Query, ncMax int) chan FetchResponse
 }
 
 type clientImpl struct{}
@@ -27,7 +35,9 @@ func NewClient() Client {
 	return &clientImpl{}
 }
 
-func (c *clientImpl) FetchCountries(q Query, n int) ([]models.Country, error) {
+func (c *clientImpl) fetchCountries(
+	q Query, ncMax int,
+) ([]models.Country, error) {
 	url := q.buildURL()
 
 	response, err := http.Get(url)
@@ -56,26 +66,26 @@ func (c *clientImpl) FetchCountries(q Query, n int) ([]models.Country, error) {
 		return nil, err
 	}
 
-	// Setting n to -1 lets fetching all matching countries, for instance,
+	// Setting ncMax to -1 lets fetching all matching countries, for instance,
 	// all countries in a region
-	if n > 0 && len(countries) > n {
-		countries = countries[:n]
+	if ncMax > 0 && len(countries) > ncMax {
+		countries = countries[:ncMax]
 	}
 
 	return countries, nil
 }
 
-func (c *clientImpl) FetchRegion(q Query, n int) (*models.Region, error) {
+func (c *clientImpl) fetchRegion(q Query, ncMax int) (*models.Region, error) {
 	// Validate that the input query is RegionQuery
 	var name string
 	if rq, ok := q.(RegionQuery); ok {
 		name = rq.Region
 	} else {
 		return nil, fmt.Errorf(
-			"FetchRegion requires RegionQuery; got %T", q)
+			"fetchRegion requires RegionQuery; got %T", q)
 	}
 
-	countries, err := c.FetchCountries(q, n)
+	countries, err := c.fetchCountries(q, ncMax)
 	if err != nil {
 		return nil, err
 	}
@@ -102,24 +112,27 @@ func (c *clientImpl) FetchRegion(q Query, n int) (*models.Region, error) {
 }
 
 // Execute fetch queries each in their own goroutine.
-func Fetch[T any](
-	queries []Query,
-	fetcher func(Query, int) (T, error),
-	n int,
-) chan T {
-	ch := make(chan T, len(queries))
+func (c *clientImpl) Fetch(queries []Query, n int) chan FetchResponse {
+	var f func(Query, int) (interface{}, error)
+	if _, ok := queries[0].(RegionQuery); ok {
+		f = func(q Query, n int) (interface{}, error) {
+			return c.fetchRegion(q, n)
+		}
+	} else {
+		f = func(q Query, n int) (interface{}, error) {
+			return c.fetchCountries(q, n)
+		}
+	}
+
+	ch := make(chan FetchResponse, len(queries))
 
 	for _, q := range queries {
 		go func(query Query) {
-			res, err := fetcher(query, n)
-			if err != nil {
-				fmt.Printf("Failed to fetch data: %v\n", err)
-
-				var zero T
-				ch <- zero
-				return
+			res, err := f(query, n)
+			ch <- FetchResponse{
+				Value: res,
+				Err:   err,
 			}
-			ch <- res
 		}(q)
 	}
 	return ch
